@@ -6,15 +6,13 @@ GHDC (Gut Health Deep Classifier) is a deep learning framework for classifying g
 
 - [Features](#features)
 - [Requirements](#requirements)
-- [Project Structure](#project-structure)
-- [Data Preparation](#data-preparation)
+- [Data Preparation & Preprocessing](#data-preparation--preprocessing)
 - [Usage](#usage)
   - [Training](#training)
   - [Evaluation](#evaluation)
   - [Hyperparameter Optimization](#hyperparameter-optimization)
 - [Key Files](#key-files)
 - [Citation](#citation)
-- [License](#license)
 
 ---
 
@@ -44,21 +42,69 @@ Install dependencies:
 pip install -r requirements.txt
 ```
 
-## Project Structure
+## Data Preparation & Preprocessing
 
-GHDC_Full/
-├── dataloader.py # Data loading and preprocessing
-├── GHDC_structure.py # CNN model definition
-├── main.py # Training and evaluation script
-├── objectives.py # Optuna objective for hyperparameter tuning
-└── ...
+### Data Type
 
+- **Input Data:** Tabular microbiome abundance data in `.xlsx` or `.csv` format.
+- **Rows:** Features (e.g., OTUs, species, or genes).
+- **Columns:** Samples. The first row contains sample labels (e.g., case/control), and the rest are feature values.
 
-## Data Preparation
+### Preprocessing Steps
 
-- Place your Excel data files (e.g., `wt2d.xlsx`, `t2d.xlsx`, etc.) in the appropriate directory.
-- The first row should contain sample labels; the rest are feature values.
-- Update the `datasets` variable in `dataloader.py` to select the dataset you want to use.
+1. **Zero-Value Filtering (`dataprocesser.py`):**
+   - For each feature (row), count the number of zero values.
+   - For large datasets (columns > 200): remove features with more than 30% zero values.
+   - For small datasets: remove features with more than 25 zero values.
+   - The cleaned data is saved as an Excel file for downstream analysis.
+
+2. **Label Extraction & CLR Transformation (`dataloader.py`):**
+   - Extracts numeric labels from the first row (e.g., 0 for normal, 1 for disease).
+   - Drops the first row and first column to keep only feature values.
+   - Applies Centered Log-Ratio (CLR) transformation to the feature matrix to normalize compositional data:
+     - Adds a small constant to avoid log(0).
+     - Computes the geometric mean for each sample.
+     - Applies `log(x_i / geometric_mean)` for each feature.
+   - Splits the data into training and test sets.
+
+### Example: Data Cleaning
+
+```python
+# dataprocesser.py
+import pandas as pd
+import numpy as np
+import os
+
+dataset = 'wt2d'
+cir = pd.read_csv(fr'C:\path\to\{dataset}.csv', header=None)
+
+rows_to_drop = []
+num_rows, num_cols = cir.shape
+large_dataset_threshold = 200
+
+for index, row in cir.iterrows():
+    zero_count = (row == 0).sum() + (row == '0').sum()
+    if num_cols > large_dataset_threshold:
+        if zero_count > num_cols * 0.3:
+            rows_to_drop.append(index)
+    else:
+        if zero_count > 25:
+            rows_to_drop.append(index)
+
+cir = cir.drop(rows_to_drop, axis=0)
+os.makedirs(r"C:\path\to\cleaned_data", exist_ok=True)
+cir.to_excel(fr"C:\path\to\cleaned_data\{dataset}.xlsx", header=None)
+```
+
+### Example: CLR Transformation
+
+```python
+# dataloader.py (excerpt)
+data = np.array(data, dtype=np.float32)
+data = data + 1e-8  # Avoid log(0)
+geometric_mean = np.exp(np.mean(np.log(data), axis=1, keepdims=True))
+clr_data = np.log(data / geometric_mean)
+```
 
 ## Usage
 
@@ -96,7 +142,3 @@ To perform hyperparameter tuning with Optuna:
 ## Citation
 
 If you use this codebase in your research, please cite appropriately.
-
-## License
-
-This project is licensed under the MIT License.
