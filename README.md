@@ -1,29 +1,21 @@
-# GHDC: Gut Health Deep Classifier
+# GHDC: Global Hybird Dilated Convolution
 
-GHDC (Gut Health Deep Classifier) is a deep learning framework for classifying gut microbiome data using a custom 1D CNN architecture. The project supports data preprocessing, model training, evaluation, and hyperparameter optimization.
+GHDC (Global Hybird Dilated Convolution) is a deep learning framework for disesase prediction using a customnized 1D Dilated-CNN architecture. The project supports data preprocessing, model training, evaluation, and hyperparameter optimization.
 
 ## Table of Contents
 
-- [Features](#features)
 - [Requirements](#requirements)
 - [Data Preparation & Preprocessing](#data-preparation--preprocessing)
 - [Usage](#usage)
   - [Training](#training)
   - [Evaluation](#evaluation)
   - [Hyperparameter Optimization](#hyperparameter-optimization)
+  - [Statistical Analysis](#statistical-analysis)
+  - [Power Analysis](#power-analysis)
 - [Key Files](#key-files)
 - [Citation](#citation)
 
 ---
-
-## Features
-
-- Custom 1D CNN model for microbiome data classification
-- Data preprocessing with Centered Log-Ratio (CLR) transformation
-- Support for cross-entropy and focal loss
-- Model evaluation with metrics: Accuracy, AUC, F1, MCC, Precision, Recall, AUPR
-- Hyperparameter optimization using Optuna
-- Results logging and model checkpointing
 
 ## Requirements
 
@@ -55,7 +47,7 @@ pip install -r requirements.txt
 1. **Zero-Value Filtering (`dataprocesser.py`):**
    - For each feature (row), count the number of zero values.
    - For large datasets (columns > 200): remove features with more than 30% zero values.
-   - For small datasets: remove features with more than 25 zero values.
+   - For small datasets: remove features with more than 40 zero values.
    - The cleaned data is saved as an Excel file for downstream analysis.
 
 2. **Label Extraction & CLR Transformation (`dataloader.py`):**
@@ -88,7 +80,7 @@ for index, row in cir.iterrows():
         if zero_count > num_cols * 0.3:
             rows_to_drop.append(index)
     else:
-        if zero_count > 25:
+        if zero_count > 40:
             rows_to_drop.append(index)
 
 cir = cir.drop(rows_to_drop, axis=0)
@@ -131,6 +123,38 @@ To perform hyperparameter tuning with Optuna:
 1. Edit and run the relevant code in `objectives.py`.
 2. The `objective` function defines the search space and training loop.
 3. Best models are saved automatically.
+
+### Statistical Analysis
+
+To compare the performance of GHDC and other models across datasets using paired t-test and Wilcoxon signed-rank test:
+
+```bash
+python Statistical_analysis/t+wilcoxon.py
+```
+
+- The script merges performance metrics (e.g., AUPR) from multiple model result files (CSV/XLSX).
+- For each dataset and model, it computes:
+  - Paired t-test p-value
+  - Wilcoxon signed-rank test p-value
+  - FDR-adjusted p-values (Benjamini-Hochberg)
+  - Mean performance difference
+- Results are saved as an Excel file for further inspection.
+
+### Power Analysis
+
+To perform power analysis and feature-level statistical testing (t-test, Cohen's d, FDR correction):
+
+```bash
+python power_analysis/power_analysis.py
+```
+
+- The script reads OTU abundance data and sample labels.
+- For each OTU (feature), it:
+  - Removes features with all zero values.
+  - Splits samples into healthy and disease groups.
+  - Performs variance homogeneity test, t-test, computes Cohen's d, and statistical power.
+  - Applies FDR correction to p-values.
+- Results are saved as a CSV file, sorted by FDR q-value.
 
 ## Key Files
 
